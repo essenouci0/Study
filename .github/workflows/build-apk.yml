@@ -35,6 +35,28 @@ jobs:
       - name: Create Android project
         run: npx cap add android
 
+      - name: Apply Study app icon
+        run: |
+          RES=android/app/src/main/res
+          cp -r resources/android/res/. "$RES"/
+          mkdir -p "$RES/values" "$RES/mipmap-anydpi-v26"
+          cat > "$RES/values/ic_launcher_background.xml" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <color name="ic_launcher_background">#000000</color>
+          </resources>
+          XML
+          for n in ic_launcher ic_launcher_round; do
+            cat > "$RES/mipmap-anydpi-v26/$n.xml" <<'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background"/>
+              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+          </adaptive-icon>
+          XML
+          done
+          rm -f "$RES/drawable-v24/ic_launcher_foreground.xml" "$RES/drawable/ic_launcher_background.xml"
+
       - name: Sync web assets
         run: npx cap sync android
 

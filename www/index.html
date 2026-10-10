@@ -343,12 +343,51 @@ html[dir=ltr] #main[data-t=home] h1::before{left:auto;right:18px}html[dir=ltr] #
 .card{-webkit-backdrop-filter:none;backdrop-filter:none;background:linear-gradient(145deg,var(--p),color-mix(in srgb,var(--p) 82%,var(--bg)))}
 body.imm-on #fx *,body.imm-on .orb,body.imm-on .floor i,body.imm-on #main .view>*,body.imm-on #top .lg{animation-play-state:paused!important}
 .cb,.orb,.lvb,#fx{backface-visibility:hidden}
+/* ===== adaptive performance (tier is set by the governor script) ===== */
+html.hid *,html.hid *::before,html.hid *::after{animation-play-state:paused!important}
+html[data-perf] .lq-svg{filter:none}
+html[data-perf="2"] #fx,html[data-perf="1"] #fx,html[data-perf="2"] .floor,html[data-perf="1"] .floor,html[data-perf="2"] .orb,html[data-perf="1"] .orb{display:none}
+html[data-perf="2"] nav,html[data-perf="1"] nav,html[data-perf="2"] #ob,html[data-perf="1"] #ob{-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-perf="2"] nav,html[data-perf="1"] nav{background:var(--p)}
+html[data-perf="2"] #ob,html[data-perf="1"] #ob{background:var(--bg)}
+html[data-perf="2"] .view>*,html[data-perf="1"] .view>*{animation-name:fadein!important;animation-duration:.3s!important;animation-delay:calc(var(--i,0)*25ms)!important;animation-iteration-count:1!important;animation-timing-function:ease-out!important}
+html[data-perf="2"] .still>*:not(.pin):not(.gone):not(.outr):not(.outl),html[data-perf="1"] .still>*:not(.pin):not(.gone):not(.outr):not(.outl){animation:none!important}
+html[data-perf="2"] #main button::before,html[data-perf="1"] #main button::before{animation:none!important;display:none}
+html[data-perf="2"] .ring,html[data-perf="1"] .ring{filter:none}
+html[data-perf="1"] *,html[data-perf="1"] *::before,html[data-perf="1"] *::after{animation-iteration-count:1!important;text-shadow:none!important}
+html[data-perf="1"] .card{box-shadow:none;transition:none}
+html[data-perf="1"] #bgc{display:none}
 </style>
 </head>
 <body>
 <canvas id="bgc"></canvas><div id="main"></div><div id="toast"></div>
 <nav id="nav"></nav>
 <script>
+/* ===== performance governor =====
+   Picks a starting tier from the phone's specs, measures real frame times, and
+   steps the visuals down (3 full -> 2 medium -> 1 light) whenever the phone
+   struggles, so the app never freezes. The learned tier is remembered for 3 days. */
+var PERF=3;
+(function(){
+ const R=document.documentElement,KEY='study_perf';
+ const cores=navigator.hardwareConcurrency||4,mem=navigator.deviceMemory||4;
+ let cur=cores<=2||mem<=2?1:(cores<=4||mem<=3)?2:3;
+ try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o&&Date.now()-o.ts<2592e5&&o.t>=1&&o.t<cur)cur=o.t}catch(e){}
+ try{if(matchMedia('(prefers-reduced-motion:reduce)').matches)cur=1}catch(e){}
+ const apply=t=>{cur=t;PERF=t;R.dataset.perf=t};
+ apply(cur);
+ let lock=3500,last=0,sum=0,n=0,bad=0,t0=0,lt=0;
+ const down=()=>{if(cur<=1)return;apply(cur-1);lock=performance.now()+4000;bad=0;lt=0;try{localStorage.setItem(KEY,JSON.stringify({t:cur,ts:Date.now()}))}catch(e){}};
+ function tick(t){requestAnimationFrame(tick);
+  if(document.hidden){last=0;sum=0;n=0;t0=0;return}
+  if(last){const d=t-last;if(d<400){sum+=d;n++}}last=t;
+  if(!t0)t0=t;
+  if(t-t0>=2000){const avg=n?sum/n:0;t0=t;sum=0;n=0;
+   if(t>lock&&avg>23){if(++bad>=2)down()}else bad=0}}
+ requestAnimationFrame(tick);
+ try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(e.duration>180&&performance.now()>lock&&++lt>=3)down()}).observe({entryTypes:['longtask']});setInterval(()=>{lt=0},6000)}catch(e){}
+ document.addEventListener('visibilitychange',()=>R.classList.toggle('hid',document.hidden));
+})();
 const $=s=>document.querySelector(s);
 if(!Element.prototype.animate){Element.prototype.animate=function(){const o={};Object.defineProperty(o,'onfinish',{set:f=>{f&&f()}});return o}}
 let S=null;try{S=JSON.parse(localStorage.getItem('study')||'null')}catch(e){}
@@ -512,7 +551,7 @@ function setG(a,b){GX=Math.max(-1,Math.min(1,a));GY=Math.max(-1,Math.min(1,b));r
 addEventListener('pointermove',e=>setG(e.clientX/innerWidth*2-1,e.clientY/innerHeight*2-1));
 addEventListener('deviceorientation',e=>{if(e.gamma!=null)setG(e.gamma/30,(e.beta-45)/30)});
 document.body.insertAdjacentHTML('afterbegin','<div class="floor"><i></i></div><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>');
-function confetti(){for(let i=0;i<48;i++){const e=document.createElement('i');e.className='cf';const a=Math.random()*6.28,d=120+Math.random()*220;e.style.cssText='left:50%;top:45%;background:'+(i%3?'var(--fg)':'#888')+';width:'+(4+Math.random()*7)+'px;height:'+(8+Math.random()*8)+'px';document.body.appendChild(e);e.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:'translate('+Math.cos(a)*d+'px,'+(Math.sin(a)*d+160)+'px) rotate('+Math.random()*720+'deg)',opacity:0}],{duration:1400+Math.random()*800,easing:'cubic-bezier(.2,.7,.3,1)'}).onfinish=()=>e.remove()}}
+function confetti(){for(let i=0,n9=PERF===1?14:PERF===2?28:48;i<n9;i++){const e=document.createElement('i');e.className='cf';const a=Math.random()*6.28,d=120+Math.random()*220;e.style.cssText='left:50%;top:45%;background:'+(i%3?'var(--fg)':'#888')+';width:'+(4+Math.random()*7)+'px;height:'+(8+Math.random()*8)+'px';document.body.appendChild(e);e.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:'translate('+Math.cos(a)*d+'px,'+(Math.sin(a)*d+160)+'px) rotate('+Math.random()*720+'deg)',opacity:0}],{duration:1400+Math.random()*800,easing:'cubic-bezier(.2,.7,.3,1)'}).onfinish=()=>e.remove()}}
 document.addEventListener('pointerdown',e=>{const b=e.target.closest('button');if(!b)return;const r=b.getBoundingClientRect(),sp=document.createElement('span'),d=Math.max(r.width,r.height)*2;sp.className='rp';sp.style.cssText='width:'+d+'px;height:'+d+'px;left:'+(e.clientX-r.left-d/2)+'px;top:'+(e.clientY-r.top-d/2)+'px';b.appendChild(sp);setTimeout(()=>sp.remove(),700)});
 const HTML=document.documentElement;
 function setG(a,b){GX=Math.max(-1,Math.min(1,a));GY=Math.max(-1,Math.min(1,b))}
@@ -523,6 +562,8 @@ function setG(a,b){GX=Math.max(-1,Math.min(1,a));GY=Math.max(-1,Math.min(1,b))}
  addEventListener('resize',rs);rs();
  function f(t){requestAnimationFrame(f);
   if(document.hidden||document.body.classList.contains('imm-on')){last=t;return}
+  if(PERF===1){if(!f.z){f.z=1;x.clearRect(0,0,w,h)}last=t;return}f.z=0;
+  if(PERF===2&&t-last<30)return;
   const dt=Math.min(3,(t-last)/16.67||1);last=t;
   if(!(cc++%30))col=getComputedStyle(HTML).getPropertyValue('--fg').trim()||'#fff';
   x.clearRect(0,0,w,h);x.fillStyle=col;
@@ -650,8 +691,9 @@ const _m4=V.more;V.more=()=>_m4().replace('<div class="card"><b>عن Study</b>',
 (function(){const P={home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',subs:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M9 7h6"/>',focus:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/>',rev:'<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',more:'<circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/>'},
  ic=()=>document.querySelectorAll('nav button[data-t]').forEach(b=>{const e=b.querySelector('b');if(e&&!e.dataset.s&&P[b.dataset.t]){e.innerHTML='<svg viewBox="0 0 24 24">'+P[b.dataset.t]+'</svg>';e.dataset.s=1}}),
  R=/[\u{1F300}-\u{1FAFF}\u{2600}-\u{2725}\u{2727}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0F]/gu,
- st=()=>document.querySelectorAll('#main button').forEach(b=>{const w=document.createTreeWalker(b,4);let n;while(n=w.nextNode()){const t=n.nodeValue.replace(R,'');if(t!==n.nodeValue)n.nodeValue=t.replace(/^\s+|\s+$/g,m=>m&&' ')}});
- ic();st();new MutationObserver(ic).observe($('#nav'),{childList:true,subtree:true});let stq=0;new MutationObserver(()=>{if(stq)return;stq=requestAnimationFrame(()=>{stq=0;st()})}).observe($('#main'),{childList:true,subtree:true,characterData:true})})();
+ st=L=>(L||document.querySelectorAll('#main button')).forEach(b=>{const w=document.createTreeWalker(b,4);let n;while(n=w.nextNode()){const t=n.nodeValue.replace(R,'');if(t!==n.nodeValue)n.nodeValue=t.replace(/^\s+|\s+$/g,m=>m&&' ')}});
+ ic();st();new MutationObserver(ic).observe($('#nav'),{childList:true,subtree:true});const sp=new Set();let stq=0;new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData'){const pe=m.target.parentElement,b=pe&&pe.closest('button');if(b)sp.add(b)}else m.addedNodes.forEach(n=>{if(n.nodeType===1){const b=n.closest('button');if(b)sp.add(b);else n.querySelectorAll('button').forEach(x=>sp.add(x))}else if(n.nodeType===3){const pe=n.parentElement,b=pe&&pe.closest('button');if(b)sp.add(b)}})}
+  if(sp.size&&!stq)stq=requestAnimationFrame(()=>{stq=0;const L=[...sp];sp.clear();st(L)})}).observe($('#main'),{childList:true,subtree:true,characterData:true})})();
 (function(){const e=document.createElement('div');e.id='splash';e.innerHTML='<div class="sl">'+LOGO+'</div><div class="stx">'+[...'STUDY'].map((c,k)=>'<span style="--k:'+k+'">'+c+'</span>').join('')+'</div>';document.body.appendChild(e);const x=()=>e.remove();e.onclick=x;setTimeout(x,2500)})();
 
 
@@ -677,26 +719,32 @@ immHTML=function(){return '<div class="imm-stage">'+chr('i',0)+'</div><div class
 const _fv=V.focus;V.focus=function(){return _fv().replace(/<svg class="ring[\s\S]*?<\/svg>/,chr('',1))};
 (function(){const NS='http://www.w3.org/2000/svg';let last=0;
  function mk(el,p){const bb=el.querySelector('#'+p+'bb'),B=[];for(let i=0;i<9;i++){const c=document.createElementNS(NS,'circle');bb.appendChild(c);B.push({c,x:30+Math.random()*160,y:230,r:1.5+Math.random()*3.2,s:.25+Math.random()*.5,w:Math.random()*6.28,d:Math.random()*200})}
-  return{p,B,lvl:216,ph:Math.random()*6,amp:2.5,tilt:0,v:0,lastLvl:216}}
- function path(lvl,amp,ph,tilt,off,k){let d='';for(let x=-10;x<=230;x+=6){const y=lvl+off-(x-110)*tilt*.2+amp*Math.sin(x*.05*k+ph)+amp*.45*Math.sin(x*.105-ph*1.35);d+=(d?'L':'M')+x+' '+y.toFixed(1)}return d+'L230 240L-10 240Z'}
- function f(t){requestAnimationFrame(f);const dt=Math.min(3,(t-last)/16.67||1);last=t;if(document.hidden)return;
+  return{r:{},p,B,lvl:216,ph:Math.random()*6,amp:2.5,tilt:0,v:0,lastLvl:216}}
+ function path(lvl,amp,ph,tilt,off,k){let d='';for(let x=-10,sp=PERF===3?6:PERF===2?8:12;x<=230;x+=sp){const y=lvl+off-(x-110)*tilt*.2+amp*Math.sin(x*.05*k+ph)+amp*.45*Math.sin(x*.105-ph*1.35);d+=(d?'L':'M')+x+' '+y.toFixed(1)}return d+'L230 240L-10 240Z'}
+ function f(t){requestAnimationFrame(f);if(document.hidden){last=t;return}const gap=PERF===3?0:PERF===2?30:48;if(t-last<gap)return;const dt=Math.min(3,(t-last)/16.67||1);last=t;
   document.querySelectorAll('.liq').forEach(el=>{let S=LQS.get(el);if(!S){const p=el.id.slice(0,-2);S=mk(el,p);LQS.set(el,S)}
    const run=!!T.run,rem=run?Math.max(0,(T.end-Date.now())/1000):T.left,fr=T.total?rem/T.total:1,tgt=214-212*fr;
    S.lvl+=(tgt-S.lvl)*Math.min(1,.07*dt);
    const tg=Math.max(-1,Math.min(1,(typeof SX==='number'?SX:0)));S.v+=(tg-S.tilt)*.05*dt;S.v*=Math.pow(.9,dt);S.tilt+=S.v*dt;
    const base=run?4.4:2.6;S.amp+=(base+Math.min(5,Math.abs(S.v)*40)+LK*.9-S.amp)*Math.min(1,.06*dt);
    S.ph+=dt*(run?.06:.028);
-   const d1=path(S.lvl,S.amp,S.ph,S.tilt,0,1),d2=path(S.lvl,S.amp*.9,-S.ph*.8+1.7,S.tilt,-3.5,.9),p=S.p,g=id=>el.querySelector('#'+p+id);
+   const d1=path(S.lvl,S.amp,S.ph,S.tilt,0,1),d2=path(S.lvl,S.amp*.9,-S.ph*.8+1.7,S.tilt,-3.5,.9),p=S.p,g=id=>S.r[id]||(S.r[id]=el.querySelector('#'+p+id));
    g('w1').setAttribute('d',d1);g('cwp').setAttribute('d',d1);g('w2').setAttribute('d',d2);
-   S.B.forEach(b=>{b.y-=b.s*(run?1.6:.7)*dt;b.x+=Math.sin(t/600+b.w)*.25*dt;if(b.y<S.lvl+4||b.y<-5){b.y=215+Math.random()*30;b.x=30+Math.random()*160}b.c.setAttribute('cx',b.x.toFixed(1));b.c.setAttribute('cy',b.y.toFixed(1));b.c.setAttribute('r',b.r.toFixed(1))})});
+   if(PERF>1)S.B.forEach(b=>{b.y-=b.s*(run?1.6:.7)*dt;b.x+=Math.sin(t/600+b.w)*.25*dt;if(b.y<S.lvl+4||b.y<-5){b.y=215+Math.random()*30;b.x=30+Math.random()*160}b.c.setAttribute('cx',b.x.toFixed(1));b.c.setAttribute('cy',b.y.toFixed(1));b.c.setAttribute('r',b.r.toFixed(1))})});
   LK*=Math.pow(.92,dt)}
  requestAnimationFrame(f)})();
 
 // emoji -> grayscale only on the emoji themselves (cheap) instead of filtering whole screen layers
-(function(){const E=/(?:[\u{1F300}-\u{1FAFF}\u{2600}-\u{2725}\u{2727}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}][\uFE0F\u200D]*)+/gu,T0=/[\u{1F300}-\u{1FAFF}\u{2600}-\u{2725}\u{2727}-\u{27BF}\u{2B00}-\u{2BFF}]/u;let q=0;
- const run=()=>{q=0;const w=document.createTreeWalker(document.body,4,{acceptNode:n=>{const p=n.parentElement;return p&&!p.closest('script,style,textarea,.emj,.tw,#fx')&&T0.test(n.nodeValue)?1:3}}),L=[];let n;while(n=w.nextNode())L.push(n);
-  L.forEach(n=>{const t=n.nodeValue,f=document.createDocumentFragment();let i=0,m;E.lastIndex=0;while(m=E.exec(t)){if(m.index>i)f.append(t.slice(i,m.index));const e=document.createElement('span');e.className='emj';e.textContent=m[0];f.append(e);i=m.index+m[0].length}if(i<t.length)f.append(t.slice(i));n.replaceWith(f)})};
- new MutationObserver(()=>{if(!q)q=requestAnimationFrame(run)}).observe(document.body,{childList:true,subtree:true,characterData:true});run()})();
+(function(){const E=/(?:[\u{1F300}-\u{1FAFF}\u{2600}-\u{2725}\u{2727}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}][\uFE0F\u200D]*)+/gu,T0=/[\u{1F300}-\u{1FAFF}\u{2600}-\u{2725}\u{2727}-\u{27BF}\u{2B00}-\u{2BFF}]/u;let q=0;const pend=new Set(),SKIP='script,style,textarea,.emj,.tw,#fx,.liq';
+ const ok=n=>{const p=n.parentElement;return p&&!p.closest(SKIP)&&T0.test(n.nodeValue)};
+ const run=()=>{q=0;const L=[];
+  pend.forEach(r=>{if(!r.isConnected)return;
+   if(r.nodeType===3){if(ok(r))L.push(r);return}
+   if(r.nodeType!==1||r.closest(SKIP))return;
+   const w=document.createTreeWalker(r,4,{acceptNode:n=>ok(n)?1:3});let n;while(n=w.nextNode())L.push(n)});
+  pend.clear();
+  L.forEach(n=>{if(!n.isConnected)return;const t=n.nodeValue,f=document.createDocumentFragment();let i=0,m;E.lastIndex=0;while(m=E.exec(t)){if(m.index>i)f.append(t.slice(i,m.index));const e=document.createElement('span');e.className='emj';e.textContent=m[0];f.append(e);i=m.index+m[0].length}if(i<t.length)f.append(t.slice(i));n.replaceWith(f)})};
+ new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')pend.add(m.target);else m.addedNodes.forEach(n=>pend.add(n))}if(pend.size&&!q)q=requestAnimationFrame(run)}).observe(document.body,{childList:true,subtree:true,characterData:true});pend.add(document.body);run()})();
 const _clk=()=>{const e=$('#clk');if(e)e.textContent=new Date().toLocaleTimeString('ar',{hour:'numeric',minute:'2-digit'})};
 setInterval(_clk,5000);document.addEventListener('visibilitychange',_clk);
 render();onboard();
